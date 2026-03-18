@@ -1,8 +1,8 @@
-name: 每日AI设计文章推送至UED群(最终无星号版)
+name: 每日AI设计文章推送至UED群(最终稳定版)
 
 on:
   schedule:
-    - cron: '0 2 * * *'  # 北京时间每天10点
+    - cron: '0 2 * * *'  # 北京时间每天10点自动推送
   workflow_dispatch:  # 允许手动触发
 
 jobs:
@@ -25,7 +25,7 @@ jobs:
           URL3="https://www.infoq.cn/search?q=AI%20%E5%8C%BB%E7%96%97%20%E8%AE%BE%E8%AE%A1"
           CONTENT3="人工智能与医疗设计的深度融合，从交互体验到智能辅助，探索下一代医疗产品体验。"
 
-          # ====================== 2. 轮播逻辑 ======================
+          # ====================== 2. 时间轮播逻辑 ======================
           HOUR=$(date +%H)
           if [ $HOUR -lt 8 ]; then
             TITLE="$TITLE1"; URL="$URL1"; CONTENT="$CONTENT1"
@@ -35,24 +35,19 @@ jobs:
             TITLE="$TITLE3"; URL="$URL3"; CONTENT="$CONTENT3"
           fi
 
-          # ====================== 3. 构造Markdown消息（无星号+加粗） ======================
-          # 注意：Markdown格式下，\n需要转义为\\n，同时用**包裹标题实现加粗
-          MSG_MD="【UED每日AI设计精选】\\n\\n**今日主题：** $TITLE\\n\\n阅读全文：$URL\\n\\n简讯：$CONTENT"
+          # ====================== 3. 最终排版（链接可点击 + 无加粗） ======================
+          # 纯文本格式，保证链接100%可点击
+          MSG="【UED每日AI设计精选】\n\n今日主题：$TITLE\n阅读全文：$URL\n简讯：$CONTENT"
           
-          echo "MSG_MD=$MSG_MD" >> $GITHUB_OUTPUT
+          echo "MSG=$MSG" >> $GITHUB_OUTPUT
 
-      - name: 推送（Markdown格式，保证加粗+链接可点击）
+      - name: 推送到UED微信群（纯文本格式）
         run: |
-          MSG_MD="${{ steps.build_msg.outputs.MSG_MD }}"
+          MSG="${{ steps.build_msg.outputs.MSG }}"
           WEBHOOK="https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=b11bdccd-3062-496d-a285-10142b4a7e5a"
           
-          # 构造标准Markdown消息
-          DATA="{
-            \"msgtype\": \"markdown\",
-            \"markdown\": {
-              \"content\": \"$MSG_MD\"
-            }
-          }"
+          # 关键：使用 text 格式，企业微信对纯 https 链接识别最稳定
+          DATA="{\"msgtype\": \"text\", \"text\": {\"content\": \"$MSG\"}}"
           
           curl -s --max-time 5 \
             -X POST \
@@ -60,4 +55,4 @@ jobs:
             -d "$DATA" \
             "$WEBHOOK"
           
-          echo "✅ 无星号版推送成功！"
+          echo "✅ 最终稳定版推送成功！"
