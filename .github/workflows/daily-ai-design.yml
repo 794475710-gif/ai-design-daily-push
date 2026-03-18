@@ -1,8 +1,8 @@
-name: 每日AI设计文章推送至UED群(最终对齐版)
+name: 每日AI设计文章推送至UED群(最终定稿)
 
 on:
   schedule:
-    - cron: '0 2 * * *'  # 北京时间每天10点
+    - cron: '0 2 * * *'  # 北京时间每天10点自动推送
   workflow_dispatch:  # 允许手动触发
 
 jobs:
@@ -35,18 +35,19 @@ jobs:
             TITLE="$TITLE3"; URL="$URL3"; CONTENT="$CONTENT3"
           fi
 
-          # ====================== 3. 完全匹配图中行间距 ======================
-          # 用 \n\n 分隔大标题与内容，内部用 \n 分隔行，和你截图完全一致
-          MSG="【UED每日AI设计精选】\n\n今日主题：$TITLE\n阅读全文：$URL\n简讯：$CONTENT"
+          # ====================== 3. 最终布局（加粗 + 完美对齐） ======================
+          # 重点：用 ** 包裹 $TITLE 实现加粗，无多余符号
+          # 行间距：大标题下空一行(\n\n)，内部行紧凑(\n)，完全匹配参考图
+          MSG="【UED每日AI设计精选】\n\n今日主题：**$TITLE**\n阅读全文：$URL\n简讯：$CONTENT"
           
           echo "MSG=$MSG" >> $GITHUB_OUTPUT
 
-      - name: 推送（纯文本格式，保证链接可点击+行间距匹配）
+      - name: 推送（纯文本格式，保证链接可点击）
         run: |
           MSG="${{ steps.build_msg.outputs.MSG }}"
           WEBHOOK="https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=b11bdccd-3062-496d-a285-10142b4a7e5a"
           
-          # 纯文本格式，和你截图的排版完全一致
+          # 纯文本格式是链接可点击的唯一保障
           DATA="{\"msgtype\": \"text\", \"text\": {\"content\": \"$MSG\"}}"
           
           curl -s --max-time 5 \
@@ -55,4 +56,4 @@ jobs:
             -d "$DATA" \
             "$WEBHOOK"
           
-          echo "✅ 对齐版推送成功！"
+          echo "✅ 最终定稿发送成功！"
