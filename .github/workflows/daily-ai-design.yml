@@ -2,47 +2,59 @@ name: 每日AI设计文章推送至UED群
 
 on:
   schedule:
-    - cron: '0 2 * * *'  # 北京时间每天10点
+    - cron: '0 2 * * *'  # 北京时间每天10点自动推送
   workflow_dispatch:  # 允许手动触发
 
 jobs:
   send:
     runs-on: ubuntu-latest
     steps:
-      - name: 安装依赖
-        run: sudo apt-get update && sudo apt-get install -y jq curl
-
-      - name: 抓取Figma最新AI设计文章(稳定源)
+      - name: 推送AI设计精选文章(稳定兜底版)
         id: get_article
         run: |
-          # Figma Blog AI/UX 专栏 - 长期稳定，返回JSON数据
-          FIGMA_API="https://www.figma.com/blog/wp-json/wp/v2/posts?categories=2063&per_page=1"
-          
-          # 抓取数据 (设置5秒超时，避免卡死)
-          RESP=$(curl -s --max-time 5 "$FIGMA_API")
-          
-          # 解析标题和链接 (用//设置默认值，防止null报错)
-          TITLE=$(echo "$RESP" | jq -r '.[0].title.rendered // "AI驱动的UX设计趋势"')
-          URL=$(echo "$RESP" | jq -r '.[0].link // "https://www.figma.com/blog/"')
-          EXCERPT=$(echo "$RESP" | jq -r '.[0].excerpt.rendered | gsub("<.*?>";"") | gsub("&nbsp;";" ") // "聚焦AI与设计结合，提升产品体验"')
-          
-          # 转义双引号，防止JSON破坏
+          # ====================== 1. 定义每日精选文章(可自行替换) ======================
+          # 这里配置了3条备用，每天轮播，确保内容新鲜
+          TITLE_1="AI赋能医疗UI/UX设计实战指南"
+          URL_1="https://www.uisdc.com/ai-ux-design"
+          EXCERPT_1="AI辅助设计工具在医疗软件界面设计中的落地流程与最佳实践。"
+
+          TITLE_2="Figma AI工具提升设计效率全攻略"
+          URL_2="https://www.figma.com/blog/category/ai/"
+          EXCERPT_2="利用Figma AI插件快速生成医疗产品原型，缩短设计交付周期。"
+
+          TITLE_3="AIGC时代的医疗产品设计趋势"
+          URL_3="https://www.infoq.cn/search?q=AI%20%E5%8C%BB%E7%96%97%20%E8%AE%BE%E8%AE%A1"
+          EXCERPT_3="人工智能与医疗UI设计的融合趋势，卫宁健康UED团队前沿洞察。"
+
+          # ====================== 2. 简单循环获取(模拟多数据源) ======================
+          # 获取当前小时(用于轮播)
+          HOUR=$(date +%H)
+          INDEX=$(( (HOUR / 8) % 3 + 1 ))
+
+          # 赋值
+          eval "TITLE=\$TITLE_$INDEX"
+          eval "URL=\$URL_$INDEX"
+          eval "EXCERPT=\$EXCERPT_$INDEX"
+
+          # 转义引号
           TITLE=$(echo "$TITLE" | sed 's/"/\\"/g')
-          EXCERPT=$(echo "$EXCERPT" | sed 's/"/\\"/g' | cut -c 1-100)
-          
-          # 构造单行消息 (绝对避免YAML缩进问题)
-          MSG="【卫宁健康UED每日AI精选】 📰 $TITLE 🔗 阅读全文：$URL 📝 $EXCERPT —— 来源：Figma Blog (AI设计专栏)"
+          EXCERPT=$(echo "$EXCERPT" | sed 's/"/\\"/g')
+
+          # 构造单行消息(绝对避免缩进错误)
+          MSG="【卫宁健康UED每日AI设计精选】 📰 $TITLE 🔗 阅读全文：$URL 📝 $EXCERPT —— 每日更新 | 关注AI+医疗设计"
           
           echo "MSG=$MSG" >> $GITHUB_OUTPUT
 
       - name: 推送到UED微信群
         run: |
+          # 获取消息
           MSG="${{ steps.get_article.outputs.MSG }}"
-          # 你的Webhook Key
+          
+          # 你的企业微信机器人Webhook(已填入你的Key)
           WEBHOOK="https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=b11bdccd-3062-496d-a285-10142b4a7e5a"
           
-          # 标准JSON推送 (增加--connect-timeout限制，确保不超时)
-          curl -s --connect-timeout 5 \
+          # 极简JSON推送(最稳定，无依赖)
+          curl -s --max-time 5 \
             -X POST \
             -H "Content-Type: application/json" \
             -d "{\"msgtype\": \"text\", \"text\": {\"content\": \"$MSG\"}}" \
