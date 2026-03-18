@@ -2,7 +2,8 @@ name: 每日AI设计文章推送至UED群
 
 on:
   schedule:
-    - cron: '0 2 * * *'  # 北京时间每天10点推送（UTC+8，所以写0 2）
+    - cron: '0 2 * * *'  # 北京时间每天10点推送（UTC+8）
+  workflow_dispatch:  # 新增：开启手动触发按钮
 
 jobs:
   send:
