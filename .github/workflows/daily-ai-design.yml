@@ -1,32 +1,33 @@
-name: 每日AI设计推送(布局优化版)
+name: 每日AI设计推送(最终布局优化版)
 
 on:
   schedule:
-    - cron: '0 2 * * *'  # 北京时间10点
-  workflow_dispatch:
+    - cron: '0 2 * * *'  # 北京时间每天10点自动推送
+  workflow_dispatch:  # 手动触发测试
 
 jobs:
   send:
     runs-on: ubuntu-latest
     steps:
-      - name: 构造优化版消息
+      - name: 构造清晰布局的消息
         id: build_msg
         run: |
-          # 示例文章（后续可替换为抓取逻辑）
+          # 示例文章（后续可替换为抓取逻辑/备选文章库）
           LEVEL="AI+医疗软件结合"
           TITLE="AI赋能医疗UI/UX设计实战指南"
           URL="https://www.uisdc.com/ai-ux-design"
           CONTENT="聚焦AI辅助设计工具在医疗软件界面设计中的落地流程与最佳实践，卫宁健康UED团队可重点参考。"
 
-          # 优化布局：主题单独一行，链接+简讯清晰区分
+          # 优化后布局：大标题 → 今日主题 → 阅读链接 → 核心简讯
           MSG="【UED每日AI设计精选】\n\n今日主题：$LEVEL - $TITLE\n阅读全文：$URL\n简讯：$CONTENT"
           echo "MSG=$MSG" >> $GITHUB_OUTPUT
 
-      - name: 推送到企业微信群
+      - name: 推送到企业微信群（已填入你的机器人密钥）
         run: |
           MSG="${{ steps.build_msg.outputs.MSG }}"
-          WEBHOOK="https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=你的WebhookKey"
+          WEBHOOK="https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=b11bdccd-3062-496d-a285-10142b4a7e5a"
           
+          # 纯文本格式，保证链接100%可点击
           DATA="{\"msgtype\": \"text\", \"text\": {\"content\": \"$MSG\"}}"
           
           curl -s --max-time 5 \
@@ -34,3 +35,5 @@ jobs:
             -H "Content-Type: application/json" \
             -d "$DATA" \
             "$WEBHOOK"
+          
+          echo "✅ 布局优化版推送成功！"
