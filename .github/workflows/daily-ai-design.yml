@@ -72,14 +72,8 @@ jobs:
           TITLE=$(echo "$TITLE" | sed 's/"/\\"/g')
           EXCERPT=$(echo "$EXCERPT" | sed 's/"/\\"/g')
           
-          MSG="【卫宁健康UED每日AI设计精选】
-          
-📰 标题：$TITLE
-🔗 原文链接：$URL
-📝 摘要：$EXCERPT
-📌 来源：$SOURCE
-
-—— 由AI助手自动推送 | 覆盖优设/站酷/AI前线多平台"
+          # 改为单行消息，彻底避免YAML多行缩进问题
+          MSG="【卫宁健康UED每日AI设计精选】 📰 标题：$TITLE 🔗 原文链接：$URL 📝 摘要：$EXCERPT 📌 来源：$SOURCE —— 由AI助手自动推送 | 覆盖优设/站酷/AI前线多平台"
           
           echo "MSG=$MSG" >> $GITHUB_OUTPUT
 
