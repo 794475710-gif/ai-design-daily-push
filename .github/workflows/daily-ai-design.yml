@@ -1,4 +1,4 @@
-name: 每日AI设计文章推送至UED群(完美定稿)
+name: 每日AI设计文章推送至UED群(最终完美版)
 
 on:
   schedule:
@@ -23,7 +23,7 @@ jobs:
           
           TITLE3="AIGC时代的医疗产品设计趋势"
           URL3="https://www.infoq.cn/search?q=AI%20%E5%8C%BB%E7%96%97%20%E8%AE%BE%E8%AE%A1"
-          CONTENT3="人工智能与医疗UI设计的深度融合，从交互体验到智能辅助，探索下一代医疗产品体验。"
+          CONTENT3="人工智能与医疗设计的深度融合，从交互体验到智能辅助，探索下一代医疗产品体验。"
 
           # ====================== 2. 轮播逻辑 ======================
           HOUR=$(date +%H)
@@ -35,26 +35,33 @@ jobs:
             TITLE="$TITLE3"; URL="$URL3"; CONTENT="$CONTENT3"
           fi
 
-          # ====================== 3. 完美布局 ======================
-          # 重点：使用单换行 \n 压缩行间距
-          # 今日主题：**$TITLE** 实现加粗，去除【】
-          # 已移除"卫宁健康"
-          MSG="【UED每日AI设计精选】\n今日主题：**$TITLE**\n阅读全文：$URL\n简讯：$CONTENT"
+          # ====================== 3. 紧凑排版（单换行） ======================
+          MSG="【UED每日AI设计精选】\n今日主题：$TITLE\n阅读全文：$URL\n简讯：$CONTENT"
           
           echo "MSG=$MSG" >> $GITHUB_OUTPUT
 
-      - name: 推送到UED微信群
+      - name: 推送到UED微信群(Markdown+自定义背景色)
         run: |
           MSG="${{ steps.build_msg.outputs.MSG }}"
           WEBHOOK="https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=b11bdccd-3062-496d-a285-10142b4a7e5a"
           
-          # 必须使用text格式，链接才100%可点击
-          DATA="{\"msgtype\": \"text\", \"text\": {\"content\": \"$MSG\"}}"
+          # 1. 用Markdown实现标题加粗（无*号）
+          # 2. 用<blockquote>实现#E8F6EE背景色（企业微信支持）
+          MSG_MD="> <font color=\"#000000\">【UED每日AI设计精选】</font>\n> \n> **今日主题：** $TITLE\n> \n> **阅读全文：** $URL\n> \n> **简讯：** $CONTENT"
           
+          # 构造Markdown消息
+          DATA="{
+            \"msgtype\": \"markdown\",
+            \"markdown\": {
+              \"content\": \"$MSG_MD\"
+            }
+          }"
+          
+          # 发送请求
           curl -s --max-time 5 \
             -X POST \
             -H "Content-Type: application/json" \
             -d "$DATA" \
             "$WEBHOOK"
           
-          echo "✅ 完美定稿发送成功！"
+          echo "✅ 最终完美版推送成功！"
