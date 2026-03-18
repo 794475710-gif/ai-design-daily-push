@@ -1,4 +1,4 @@
-name: 每日AI设计文章推送至UED群(最终完美版)
+name: 每日AI设计文章推送至UED群(最终对齐版)
 
 on:
   schedule:
@@ -9,10 +9,10 @@ jobs:
   send:
     runs-on: ubuntu-latest
     steps:
-      - name: 构造最终版消息
+      - name: 构造消息
         id: build_msg
         run: |
-          # ====================== 1. 配置文章 ======================
+          # ====================== 1. 文章配置 ======================
           TITLE1="AI赋能医疗UI/UX设计实战指南"
           URL1="https://www.uisdc.com/ai-ux-design"
           CONTENT1="聚焦AI辅助设计工具在医疗软件界面设计中的落地流程与最佳实践，卫宁健康UED团队可重点参考。"
@@ -35,33 +35,24 @@ jobs:
             TITLE="$TITLE3"; URL="$URL3"; CONTENT="$CONTENT3"
           fi
 
-          # ====================== 3. 紧凑排版（单换行） ======================
-          MSG="【UED每日AI设计精选】\n今日主题：$TITLE\n阅读全文：$URL\n简讯：$CONTENT"
+          # ====================== 3. 完全匹配图中行间距 ======================
+          # 用 \n\n 分隔大标题与内容，内部用 \n 分隔行，和你截图完全一致
+          MSG="【UED每日AI设计精选】\n\n今日主题：$TITLE\n阅读全文：$URL\n简讯：$CONTENT"
           
           echo "MSG=$MSG" >> $GITHUB_OUTPUT
 
-      - name: 推送到UED微信群(Markdown+自定义背景色)
+      - name: 推送（纯文本格式，保证链接可点击+行间距匹配）
         run: |
           MSG="${{ steps.build_msg.outputs.MSG }}"
           WEBHOOK="https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=b11bdccd-3062-496d-a285-10142b4a7e5a"
           
-          # 1. 用Markdown实现标题加粗（无*号）
-          # 2. 用<blockquote>实现#E8F6EE背景色（企业微信支持）
-          MSG_MD="> <font color=\"#000000\">【UED每日AI设计精选】</font>\n> \n> **今日主题：** $TITLE\n> \n> **阅读全文：** $URL\n> \n> **简讯：** $CONTENT"
+          # 纯文本格式，和你截图的排版完全一致
+          DATA="{\"msgtype\": \"text\", \"text\": {\"content\": \"$MSG\"}}"
           
-          # 构造Markdown消息
-          DATA="{
-            \"msgtype\": \"markdown\",
-            \"markdown\": {
-              \"content\": \"$MSG_MD\"
-            }
-          }"
-          
-          # 发送请求
           curl -s --max-time 5 \
             -X POST \
             -H "Content-Type: application/json" \
             -d "$DATA" \
             "$WEBHOOK"
           
-          echo "✅ 最终完美版推送成功！"
+          echo "✅ 对齐版推送成功！"
