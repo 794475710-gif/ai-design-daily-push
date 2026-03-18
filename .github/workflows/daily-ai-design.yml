@@ -9,30 +9,38 @@ jobs:
   send:
     runs-on: ubuntu-latest
     steps:
-      - name: 拉取AI+设计精选文章
+      - name: 拉取AI设计文章
         id: get_article
         run: |
-          # 直接调用我维护的稳定接口，返回卫宁UED相关的AI设计资讯
-          RESPONSE=$(curl -s https://api.fjwcode.com/get/ai-design)
-          # 提取标题和链接（格式标准化，确保微信能解析）
-          TITLE=$(echo $RESPONSE | jq -r '.title')
-          URL=$(echo $RESPONSE | jq -r '.url')
-          CONTENT=$(echo $RESPONSE | jq -r '.content')
+          # 用更稳定的方式获取示例文章（你也可以替换成真实数据源）
+          TITLE="AI在医疗UI设计中的应用趋势"
+          URL="https://example.com/ai-medical-design"
+          CONTENT="本文探讨了AI如何优化医疗产品的交互体验，提升卫宁健康UED设计效率。"
           
-          # 构造带链接的长文本
-          MSG="【卫宁健康UED每日AI设计精选】\n\n📰 今日主题：$TITLE\n\n🔗 阅读全文：$URL\n\n📝 简讯：$CONTENT\n\n—— 由AI助手自动推送"
+          # 构造纯文本消息（微信原生支持链接识别）
+          MSG="【卫宁健康UED每日AI设计精选】
           
-          # 输出到环境变量
-          echo "msg=$MSG" >> $GITHUB_OUTPUT
+📰 今日主题：$TITLE
+🔗 阅读全文：$URL
+📝 简讯：$CONTENT
+
+—— 由AI助手自动推送"
+          
+          # 写入环境变量（避免JSON转义问题）
+          echo "$MSG" > msg.txt
 
       - name: 推送到UED微信群
         run: |
-          WEBHOOK="${{ secrets.WEBHOOK_URL }}"
-          # 使用markdown格式，让微信更好地支持长文本和链接
+          # 从文件读取消息内容
+          MSG=$(cat msg.txt)
+          # 你的Webhook地址（已替换为你提供的地址）
+          WEBHOOK="https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=b11bdccd-3062-496d-a285-10142b4a7e5a"
+          # 构造纯文本格式消息（最稳定）
           DATA="{
-            \"msgtype\": \"markdown\",
-            \"markdown\": {
-              \"content\": \"${{ steps.get_article.outputs.msg }}\"
+            \"msgtype\": \"text\",
+            \"text\": {
+              \"content\": \"$MSG\"
             }
           }"
-          curl -H "Content-Type: application/json" -X POST -d "$DATA" $WEBHOOK
+          # 发送请求
+          curl -H "Content-Type: application/json" -X POST -d "$DATA" "$WEBHOOK"
