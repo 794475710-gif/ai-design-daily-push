@@ -2,34 +2,37 @@ name: 每日AI设计文章推送至UED群
 
 on:
   schedule:
-    - cron: '0 2 * * *'  # 北京时间每天10点推送（UTC+8）
-  workflow_dispatch:  # 新增：开启手动触发按钮
+    - cron: '0 2 * * *'  # 北京时间每天10点
+  workflow_dispatch:  # 允许手动触发
 
 jobs:
   send:
     runs-on: ubuntu-latest
     steps:
-      - name: 拉取AI+设计文章
+      - name: 拉取AI+设计精选文章
         id: get_article
         run: |
-          # 抓取适配卫宁健康UED的AI+设计文章（含医疗设计关键词）
-          ARTICLE=$(curl -s "https://api.fjwcode.com/ai-design-article" | jq -r '.content')
-          # 处理空内容，避免推送失败
-          if [ -z "$ARTICLE" ]; then
-            ARTICLE="今日暂无AI+设计相关优质文章，建议查看站酷/优设最新资讯～"
-          fi
-          echo "article=$ARTICLE" >> $GITHUB_OUTPUT
+          # 直接调用我维护的稳定接口，返回卫宁UED相关的AI设计资讯
+          RESPONSE=$(curl -s https://api.fjwcode.com/get/ai-design)
+          # 提取标题和链接（格式标准化，确保微信能解析）
+          TITLE=$(echo $RESPONSE | jq -r '.title')
+          URL=$(echo $RESPONSE | jq -r '.url')
+          CONTENT=$(echo $RESPONSE | jq -r '.content')
+          
+          # 构造带链接的长文本
+          MSG="【卫宁健康UED每日AI设计精选】\n\n📰 今日主题：$TITLE\n\n🔗 阅读全文：$URL\n\n📝 简讯：$CONTENT\n\n—— 由AI助手自动推送"
+          
+          # 输出到环境变量
+          echo "msg=$MSG" >> $GITHUB_OUTPUT
 
-      - name: 推送到UED微信群（企业微信机器人）
+      - name: 推送到UED微信群
         run: |
-          # 替换成你的企业微信机器人Webhook地址！！！
-          WEBHOOK="https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=b11bdccd-3062-496d-a285-10142b4a7e5a"
-          # 构造微信群推送消息（标题+摘要+链接，适配阅读体验）
+          WEBHOOK="${{ secrets.WEBHOOK_URL }}"
+          # 使用markdown格式，让微信更好地支持长文本和链接
           DATA="{
-            \"msgtype\": \"text\",
-            \"text\": {
-              \"content\": \"【卫宁健康UED每日AI设计文章】\n$ARTICLE\"
+            \"msgtype\": \"markdown\",
+            \"markdown\": {
+              \"content\": \"${{ steps.get_article.outputs.msg }}\"
             }
           }"
-          # 发送请求到企业微信机器人
           curl -H "Content-Type: application/json" -X POST -d "$DATA" $WEBHOOK
