@@ -2,27 +2,98 @@ name: 每日AI设计文章推送至UED群
 
 on:
   schedule:
-    - cron: '0 2 * * *'  # 北京时间每天10点
-  workflow_dispatch:  # 允许手动触发
+    - cron: '0 2 * * *'  # 北京时间每天10点自动推送
+  workflow_dispatch:  # 保留手动触发按钮
 
 jobs:
   send:
     runs-on: ubuntu-latest
     steps:
-      - name: 构造推送内容
-        id: build_msg
+      - name: 安装依赖（jq用于解析JSON）
+        run: sudo apt-get update && sudo apt-get install -y jq curl
+
+      - name: 抓取多平台AI+设计文章
+        id: get_article
         run: |
-          # 构造单行消息，避免YAML多行缩进问题
-          MSG="【卫宁健康UED每日AI设计精选】 📰 今日主题：AI赋能医疗UI设计 🔗 阅读全文：https://www.uisdc.com/ai-design-trends 📝 简讯：AI辅助设计工具正在大幅提升医疗产品的设计与开发效率。 —— 由AI助手自动推送"
+          # ====================== 1. 定义多数据源配置 ======================
+          # 优设网 AI设计专栏
+          UISDC_URL="https://www.uisdc.com/wp-json/wp/v2/posts?categories=119&per_page=1"
+          # 站酷 AI设计相关（关键词：AI设计、AIGC、UX）
+          ZCOOL_SEARCH="https://www.zcool.com.cn/sisj/t2p1/?kw=AI%E8%AE%BE%E8%AE%A1"
+          # AI前线（AI+产品/设计专栏）
+          AI_FRONT_URL="https://www.infoq.cn/feed/articles/category/155"
+
+          # ====================== 2. 抓取优设网文章（优先医疗设计） ======================
+          echo "开始抓取优设网文章..."
+          UISDC_RESP=$(curl -s --max-time 10 "$UISDC_URL")
+          UISDC_TITLE=$(echo "$UISDC_RESP" | jq -r '.[0].title.rendered // ""')
+          UISDC_URL=$(echo "$UISDC_RESP" | jq -r '.[0].link // ""')
+          UISDC_EXCERPT=$(echo "$UISDC_RESP" | jq -r '.[0].excerpt.rendered | gsub("<.*?>";"") | gsub("&nbsp;";" ") // ""' | cut -c 1-80)
+
+          # ====================== 3. 抓取AI前线文章 ======================
+          echo "开始抓取AI前线文章..."
+          AI_FRONT_RESP=$(curl -s --max-time 10 "$AI_FRONT_URL" | grep -o '<item>.*</item>' | head -1)
+          AI_FRONT_TITLE=$(echo "$AI_FRONT_RESP" | grep -o '<title>.*</title>' | sed 's/<title>//;s/<\/title>//' | sed 's/"/\\"/g' || "")
+          AI_FRONT_URL=$(echo "$AI_FRONT_RESP" | grep -o '<link>.*</link>' | sed 's/<link>//;s/<\/link>//' || "")
+          AI_FRONT_EXCERPT=$(echo "$AI_FRONT_RESP" | grep -o '<description>.*</description>' | sed 's/<description>//;s/<\/description>//' | cut -c 1-80 || "")
+
+          # ====================== 4. 抓取站酷文章（备用） ======================
+          echo "开始抓取站酷文章..."
+          ZCOOL_RESP=$(curl -s --max-time 10 "$ZCOOL_SEARCH" | grep -o '<a class="work-name".*href=".*".*>' | head -1)
+          ZCOOL_TITLE=$(echo "$ZCOOL_RESP" | grep -o 'title=".*"' | sed 's/title="//;s/"//' | sed 's/"/\\"/g' || "")
+          ZCOOL_URL=$(echo "$ZCOOL_RESP" | grep -o 'href=".*"' | sed 's/href="//;s/"//' | sed 's/\/\//https:\/\//' || "")
+          ZCOOL_EXCERPT="站酷精选AI设计作品，适配医疗产品UI/UX设计参考"
+
+          # ====================== 5. 优先级筛选（优设网>AI前线>站酷） ======================
+          if [ -n "$UISDC_TITLE" ] && [ "$UISDC_TITLE" != "null" ]; then
+            TITLE="$UISDC_TITLE"
+            URL="$UISDC_URL"
+            EXCERPT="$UISDC_EXCERPT"
+            SOURCE="优设网"
+          elif [ -n "$AI_FRONT_TITLE" ]; then
+            TITLE="$AI_FRONT_TITLE"
+            URL="$AI_FRONT_URL"
+            EXCERPT="$AI_FRONT_EXCERPT"
+            SOURCE="AI前线"
+          elif [ -n "$ZCOOL_TITLE" ]; then
+            TITLE="$ZCOOL_TITLE"
+            URL="$ZCOOL_URL"
+            EXCERPT="$ZCOOL_EXCERPT"
+            SOURCE="站酷"
+          else
+            # 所有源抓取失败时的备用文案
+            TITLE="AI在医疗UI设计中的应用趋势"
+            URL="https://www.uisdc.com/ai-medical-design"
+            EXCERPT="AI辅助设计工具正在大幅提升医疗产品的设计与开发效率，卫宁健康UED团队可重点关注。"
+            SOURCE="卫宁健康UED精选"
+          fi
+
+          # ====================== 6. 处理特殊字符，构造推送消息 ======================
+          TITLE=$(echo "$TITLE" | sed 's/"/\\"/g')
+          EXCERPT=$(echo "$EXCERPT" | sed 's/"/\\"/g')
+          
+          MSG="【卫宁健康UED每日AI设计精选】
+          
+📰 标题：$TITLE
+🔗 原文链接：$URL
+📝 摘要：$EXCERPT
+📌 来源：$SOURCE
+
+—— 由AI助手自动推送 | 覆盖优设/站酷/AI前线多平台"
+          
           echo "MSG=$MSG" >> $GITHUB_OUTPUT
 
       - name: 推送到UED微信群
         run: |
-          # 获取消息内容
-          MSG="${{ steps.build_msg.outputs.MSG }}"
+          # 获取最终要推送的内容
+          MSG="${{ steps.get_article.outputs.MSG }}"
+          
           # 你的企业微信机器人Webhook
           WEBHOOK="https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=b11bdccd-3062-496d-a285-10142b4a7e5a"
-          # 构造JSON数据
+          
+          # 构造JSON并推送（处理换行符和特殊字符）
           DATA="{\"msgtype\": \"text\", \"text\": {\"content\": \"$MSG\"}}"
-          # 发送请求
           curl -s -X POST -H "Content-Type: application/json" -d "$DATA" --fail "$WEBHOOK"
+          
+          # 输出日志，方便排查问题
+          echo "✅ 推送完成，内容：$MSG"
