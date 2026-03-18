@@ -1,18 +1,18 @@
-name: 每日AI设计文章推送至UED群(最终版-加粗主题)
+name: 每日AI设计文章推送至UED群(最终定稿)
 
 on:
   schedule:
-    - cron: '0 2 * * *'  # 北京时间每天10点自动推送
+    - cron: '0 2 * * *'  # 北京时间每天10点
   workflow_dispatch:  # 允许手动触发
 
 jobs:
   send:
     runs-on: ubuntu-latest
     steps:
-      - name: 构造加粗主题的推送消息
+      - name: 构造最终版消息
         id: build_msg
         run: |
-          # ====================== 1. 配置3篇高质量文章 ======================
+          # ====================== 1. 配置文章 ======================
           TITLE1="AI赋能医疗UI/UX设计实战指南"
           URL1="https://www.uisdc.com/ai-ux-design"
           CONTENT1="聚焦AI辅助设计工具在医疗软件界面设计中的落地流程与最佳实践，卫宁健康UED团队可重点参考。"
@@ -25,7 +25,7 @@ jobs:
           URL3="https://www.infoq.cn/search?q=AI%20%E5%8C%BB%E7%96%97%20%E8%AE%BE%E8%AE%A1"
           CONTENT3="人工智能与医疗UI设计的深度融合，从交互体验到智能辅助，探索下一代医疗产品体验。"
 
-          # ====================== 2. 时间轮播逻辑 ======================
+          # ====================== 2. 轮播逻辑 ======================
           HOUR=$(date +%H)
           if [ $HOUR -lt 8 ]; then
             TITLE="$TITLE1"; URL="$URL1"; CONTENT="$CONTENT1"
@@ -35,9 +35,10 @@ jobs:
             TITLE="$TITLE3"; URL="$URL3"; CONTENT="$CONTENT3"
           fi
 
-          # ====================== 3. 加粗主题+可点击链接 ======================
-          # 用**包裹主题文字，微信Markdown支持粗体
-          MSG="【卫宁健康UED每日AI设计精选】\n\n今日主题：**$TITLE**\n\n阅读全文：$URL\n\n简讯：$CONTENT"
+          # ====================== 3. 最终布局 ======================
+          # 重点：已去除"卫宁健康"，保留纯部门精选标题
+          # 用【】包裹标题，视觉突出，同时用纯text格式保证链接可点击
+          MSG="【UED每日AI设计精选】\n\n今日主题：【$TITLE】\n\n阅读全文：$URL\n\n简讯：$CONTENT"
           
           echo "MSG=$MSG" >> $GITHUB_OUTPUT
 
@@ -46,8 +47,8 @@ jobs:
           MSG="${{ steps.build_msg.outputs.MSG }}"
           WEBHOOK="https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=b11bdccd-3062-496d-a285-10142b4a7e5a"
           
-          # 用Markdown格式，保证粗体生效+链接可点击
-          DATA="{\"msgtype\": \"markdown\", \"markdown\": {\"content\": \"$MSG\"}}"
+          # 必须使用text格式，链接才100%可点击
+          DATA="{\"msgtype\": \"text\", \"text\": {\"content\": \"$MSG\"}}"
           
           curl -s --max-time 5 \
             -X POST \
@@ -55,4 +56,4 @@ jobs:
             -d "$DATA" \
             "$WEBHOOK"
           
-          echo "✅ 加粗主题版推送成功！"
+          echo "✅ 最终定稿推送成功！"
