@@ -1,4 +1,4 @@
-name: 每日AI设计文章推送至UED群(完美复刻版)
+name: 每日AI设计文章推送至UED群(1:1复刻版)
 
 on:
   schedule:
@@ -35,23 +35,23 @@ jobs:
             TITLE="$TITLE3"; URL="$URL3"; CONTENT="$CONTENT3"
           fi
 
-          # ====================== 3. 1:1 复刻参考图样式 ======================
-          # 大标题：【UED每日AI设计精选】
+          # ====================== 3. 1:1复刻参考图样式 ======================
+          # 大标题：【UED每日AI设计精选】（已去除“卫宁健康”）
           # 今日主题：文字加粗
           # 行间距：大标题后空一行，内部每行单独换行
           MSG="【UED每日AI设计精选】\n\n今日主题：$TITLE\n阅读全文：$URL\n简讯：$CONTENT"
           
           echo "MSG=$MSG" >> $GITHUB_OUTPUT
 
-      - name: 推送（Markdown 格式实现加粗）
+      - name: 推送（Markdown格式实现加粗）
         run: |
           MSG="${{ steps.build_msg.outputs.MSG }}"
           WEBHOOK="https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=b11bdccd-3062-496d-a285-10142b4a7e5a"
           
-          # 用 Markdown 语法将「今日主题: 」后的文字加粗
+          # 用sed将「今日主题：」后的文字替换为**加粗格式**
           MSG_MD=$(echo "$MSG" | sed -E 's/今日主题：([^\n]+)/今日主题：**\1**/g')
           
-          # 构造 Markdown 消息
+          # 构造Markdown消息
           DATA="{
             \"msgtype\": \"markdown\",
             \"markdown\": {
@@ -65,4 +65,4 @@ jobs:
             -d "$DATA" \
             "$WEBHOOK"
           
-          echo "✅ 完美复刻版推送成功！"
+          echo "✅ 1:1复刻版推送成功！"
