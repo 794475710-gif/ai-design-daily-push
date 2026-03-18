@@ -9,38 +9,32 @@ jobs:
   send:
     runs-on: ubuntu-latest
     steps:
-      - name: 拉取AI设计文章
-        id: get_article
+      - name: 构造推送内容
+        id: build_msg
         run: |
-          # 用更稳定的方式获取示例文章（你也可以替换成真实数据源）
-          TITLE="AI在医疗UI设计中的应用趋势"
-          URL="https://example.com/ai-medical-design"
-          CONTENT="本文探讨了AI如何优化医疗产品的交互体验，提升卫宁健康UED设计效率。"
-          
-          # 构造纯文本消息（微信原生支持链接识别）
+          # 这里写死示例内容，确保基础运行成功
+          # 后续可以替换成真实的爬虫逻辑
           MSG="【卫宁健康UED每日AI设计精选】
           
-📰 今日主题：$TITLE
-🔗 阅读全文：$URL
-📝 简讯：$CONTENT
+  📰 今日主题：AI赋能医疗UI设计
+  🔗 阅读全文：https://www.uisdc.com/ai-design-trends
+  📝 简讯：AI辅助设计工具正在大幅提升医疗产品的设计与开发效率。
 
-—— 由AI助手自动推送"
+  —— 由AI助手自动推送"
           
-          # 写入环境变量（避免JSON转义问题）
-          echo "$MSG" > msg.txt
+          # 写入输出变量
+          echo "MSG=$MSG" >> $GITHUB_OUTPUT
 
       - name: 推送到UED微信群
         run: |
-          # 从文件读取消息内容
-          MSG=$(cat msg.txt)
-          # 你的Webhook地址（已替换为你提供的地址）
+          # 1. 获取构造好的消息
+          MSG="${{ steps.build_msg.outputs.MSG }}"
+          
+          # 2. 你的企业微信机器人Webhook（已填入你的Key）
           WEBHOOK="https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=b11bdccd-3062-496d-a285-10142b4a7e5a"
-          # 构造纯文本格式消息（最稳定）
-          DATA="{
-            \"msgtype\": \"text\",
-            \"text\": {
-              \"content\": \"$MSG\"
-            }
-          }"
-          # 发送请求
-          curl -H "Content-Type: application/json" -X POST -d "$DATA" "$WEBHOOK"
+          
+          # 3. 构造JSON数据（用printf避免换行符转义错误）
+          printf -v DATA '{"msgtype": "text", "text": {"content": "%s"}}' "$MSG"
+          
+          # 4. 执行推送（添加--fail参数，确保HTTP错误能被捕获）
+          curl -s -X POST -H "Content-Type: application/json" -d "$DATA" --fail "$WEBHOOK"
