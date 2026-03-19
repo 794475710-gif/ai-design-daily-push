@@ -76,18 +76,8 @@ jobs:
           medical_title, medical_url, medical_desc = crawl_latest_article(CRAWL_RULES["AI+医疗软件结合"])
           medical_desc = f"【AI+医疗软件结合】{medical_desc[:80]}..."
 
-          # 3. 拼接2篇文章（保持清晰布局）
-          msg = f"""【UED每日AI设计精选】
-
-📌 第一篇：AI新设计形式
-标题：{design_title}
-阅读全文：{design_url}
-简讯：{design_desc}
-
-📌 第二篇：AI+医疗软件结合
-标题：{medical_title}
-阅读全文：{medical_url}
-简讯：{medical_desc}"""
+          # 3. 拼接2篇文章（用\n换行，兼容YAML语法）
+          msg = "【UED每日AI设计精选】\n\n📌 第一篇：AI新设计形式\n标题：" + design_title + "\n阅读全文：" + design_url + "\n简讯：" + design_desc + "\n\n📌 第二篇：AI+医疗软件结合\n标题：" + medical_title + "\n阅读全文：" + medical_url + "\n简讯：" + medical_desc
 
           # 传递消息到后续步骤
           print(f"::set-output name=MSG::{msg}")
@@ -96,7 +86,7 @@ jobs:
       - name: 推送到企业微信群
         run: |
           MSG="${{ steps.build_msg.outputs.MSG }}"
-          # 你的企业微信机器人密钥（已确认正确）
+          # 你的企业微信机器人密钥
           WEBHOOK="https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=b11bdccd-3062-496d-a285-10142b4a7e5a"
           
           # 纯文本格式，保证链接100%可点击
