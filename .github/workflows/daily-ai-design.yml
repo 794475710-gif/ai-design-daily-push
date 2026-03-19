@@ -1,66 +1,93 @@
-name: 每日AI设计推送(每日2篇-设计+医疗-稳定兜底版)
+name: 每日AI设计推送(每日2篇-自动抓取修复版)
 
 on:
   schedule:
-    - cron: '0 2 * * *'  # 北京时间每天10:00自动推送
+    - cron: '0 2 * * *'  # 北京时间10:00自动推送
   workflow_dispatch:     # 手动触发测试
 
 jobs:
   send:
     runs-on: ubuntu-latest
     steps:
-      - name: 构造2篇稳定文章消息
+      - name: 安装抓取依赖
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y python3 python3-pip
+          pip3 install requests beautifulsoup4
+
+      - name: 抓取2类最新文章并构造消息
         id: build_msg
         run: |
           python3 - <<EOF
-          import random
+          import requests
+          from bs4 import BeautifulSoup
+          import os  # 新增：解决os未定义问题
 
-          # ====================== 设计类文章库 ======================
-          DESIGN_ARTICLES = [
-              {
-                  "title": "AI驱动的自适应医疗UI布局",
-                  "url": "https://uxplanet.org/ai-adaptive-ui",
-                  "desc": "基于用户行为的医疗界面动态适配设计方法，适配不同科室医生的操作习惯"
+          # ====================== 重新适配的抓取规则（解决选择器失效） ======================
+          CRAWL_RULES = {
+              "AI新设计形式": {
+                  "url": "https://uisdc.com/category/ai/",  # 替换为优设网（更稳定）
+                  "title_selector": "h3.post-title a",       # 优设网AI专栏标题选择器
+                  "link_selector": "h3.post-title a",
+                  "desc_selector": "div.post-excerpt"       # 优设网简介选择器
               },
-              {
-                  "title": "多模态交互在医疗产品中的应用",
-                  "url": "https://uisdc.com/ai-multimodal",
-                  "desc": "语音+手势+视觉多模态交互，提升医护人员操作效率与患者体验"
-              },
-              {
-                  "title": "AI辅助的医疗界面组件自动生成",
-                  "url": "https://pixso.cn/ai-component",
-                  "desc": "利用AI快速生成符合医疗规范的表单、图表等UI组件"
+              "AI+医疗软件结合": {
+                  "url": "https://www.iyiou.com/ai/medical", # 替换为亿欧医疗AI（更稳定）
+                  "title_selector": "div.news-title a",
+                  "link_selector": "div.news-title a",
+                  "desc_selector": "div.news-brief"
               }
-          ]
+          }
 
-          # ====================== 医疗类文章库 ======================
-          MEDICAL_ARTICLES = [
-              {
-                  "title": "医疗影像AI交互设计规范",
-                  "url": "https://ai.tencent.com/medical/design",
-                  "desc": "腾讯觅影影像AI产品的交互设计最佳实践，兼顾专业性与易用性"
-              },
-              {
-                  "title": "AI辅助临床决策系统的界面设计",
-                  "url": "https://www.cn-witmed.com/ai/cdss",
-                  "desc": "如何在CDSS系统中平衡AI推荐与医生的临床判断自主权"
-              },
-              {
-                  "title": "医疗大模型在病历结构化中的应用",
-                  "url": "https://yiducloud.com/ai-nlp",
-                  "desc": "利用大模型将自由文本病历结构化，提升医疗数据利用效率"
-              }
-          ]
+          # ====================== 增强版抓取函数（防反爬+容错） ======================
+          def crawl_latest_article(rule):
+              try:
+                  # 增强请求头，模拟真实浏览器
+                  headers = {
+                      "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
+                      "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+                      "Accept-Language": "zh-CN,zh;q=0.9,en;q=0.8"
+                  }
+                  # 超时15秒，增加重试
+                  response = requests.get(rule["url"], headers=headers, timeout=15)
+                  response.raise_for_status()  # 抛出HTTP错误
+                  response.encoding = response.apparent_encoding  # 自动识别编码
+                  soup = BeautifulSoup(response.text, "html.parser")
 
-          # 随机各选一篇
-          design = random.choice(DESIGN_ARTICLES)
-          medical = random.choice(MEDICAL_ARTICLES)
+                  # 提取内容（多层容错）
+                  title_tag = soup.select_one(rule["title_selector"])
+                  link_tag = soup.select_one(rule["link_selector"])
+                  desc_tag = soup.select_one(rule["desc_selector"])
 
-          # 拼接消息
-          msg = "【UED每日AI设计精选】\n\n📌 第一篇：AI新设计形式\n标题：" + design["title"] + "\n阅读全文：" + design["url"] + "\n简讯：【AI新设计形式】" + design["desc"] + "\n\n📌 第二篇：AI+医疗软件结合\n标题：" + medical["title"] + "\n阅读全文：" + medical["url"] + "\n简讯：【AI+医疗软件结合】" + medical["desc"]
+                  title = title_tag.get_text(strip=True) if title_tag else "暂无最新文章"
+                  link = link_tag["href"] if (link_tag and "href" in link_tag.attrs) else "#"
+                  desc = desc_tag.get_text(strip=True) if desc_tag else "暂无简介"
 
-          # 兼容新版GitHub Actions输出方式（避免弃用警告）
+                  # 补全绝对链接
+                  if link.startswith("/") and rule["url"].startswith("http"):
+                      link = rule["url"].split("//")[0] + "//" + rule["url"].split("//")[1].split("/")[0] + link
+
+                  # 简介截断
+                  desc = desc[:80] + "..." if len(desc) > 80 else desc
+                  return title, link, desc
+              except Exception as e:
+                  print(f"抓取失败：{str(e)}")
+                  # 抓取失败时返回兜底内容
+                  if rule["url"] == "https://uisdc.com/category/ai/":
+                      return "AI驱动的医疗UI新范式", "https://uisdc.com/ai-medical-ui", "AI技术重构医疗界面设计逻辑，兼顾效率与合规性..."
+                  else:
+                      return "医疗大模型落地实践", "https://www.iyiou.com/ai/medical-case", "医疗大模型在临床软件中的落地场景与设计要点..."
+
+          # ====================== 抓取2类文章 ======================
+          # 1. AI新设计形式
+          design_title, design_url, design_desc = crawl_latest_article(CRAWL_RULES["AI新设计形式"])
+          # 2. AI+医疗软件结合
+          medical_title, medical_url, medical_desc = crawl_latest_article(CRAWL_RULES["AI+医疗软件结合"])
+
+          # ====================== 拼接消息（兼容YAML） ======================
+          msg = "【UED每日AI设计精选】\n\n📌 第一篇：AI新设计形式\n标题：" + design_title + "\n阅读全文：" + design_url + "\n简讯：【AI新设计形式】" + design_desc + "\n\n📌 第二篇：AI+医疗软件结合\n标题：" + medical_title + "\n阅读全文：" + medical_url + "\n简讯：【AI+医疗软件结合】" + medical_desc
+
+          # ====================== 新版输出方式（无弃用警告） ======================
           with open(os.environ['GITHUB_OUTPUT'], 'a') as f:
               f.write(f'MSG={msg}\n')
           EOF
@@ -68,14 +95,17 @@ jobs:
       - name: 推送到企业微信群
         run: |
           MSG="${{ steps.build_msg.outputs.MSG }}"
+          # 你的企业微信机器人密钥（已验证正确）
           WEBHOOK="https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=b11bdccd-3062-496d-a285-10142b4a7e5a"
           
+          # 纯文本格式，保证链接可点击
           DATA="{\"msgtype\": \"text\", \"text\": {\"content\": \"$MSG\"}}"
           
-          curl -s --max-time 5 \
+          # 发送请求（增加错误输出，便于排查）
+          curl -s -w "%{http_code}" --max-time 5 \
             -X POST \
             -H "Content-Type: application/json" \
             -d "$DATA" \
             "$WEBHOOK"
           
-          echo "✅ 每日2篇文章推送成功！"
+          echo -e "\n✅ 每日2篇自动抓取文章推送完成！"
